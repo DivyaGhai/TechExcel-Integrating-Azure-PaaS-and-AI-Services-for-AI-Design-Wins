@@ -85,7 +85,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-builder.Services.AddCors(options =>
+/* builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
@@ -93,7 +93,7 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
-});
+}); */
 
 app.UseHttpsRedirection();
 
@@ -133,12 +133,18 @@ app.MapGet("/Hotels/{hotelId}/Bookings/{min_date}", async (int hotelId, DateTime
     .WithName("GetRecentBookingsForHotel")
     .WithOpenApi();
 
-// This endpoint is used to send a message to the Azure OpenAI endpoint.
+
 app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
 {
     var message = await Task.FromResult(request.Form["message"]);
-    
-    return "This endpoint is not yet available.";
+    var kernel = app.Services.GetRequiredService<Kernel>();
+    var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+    var executionSettings = new OpenAIPromptExecutionSettings
+    {
+        ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
+    };
+    var response = await chatCompletionService.GetChatMessageContentAsync(message.ToString(), executionSettings, kernel);
+    return response?.Content!;
 })
     .WithName("Chat")
     .WithOpenApi();
@@ -170,21 +176,5 @@ app.MapPost("/MaintenanceCopilotChat", async ([FromBody]string message, [FromSer
 })
     .WithName("Copilot")
     .WithOpenApi();
-
-app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
-{
-    var message = await Task.FromResult(request.Form["message"]);
-    var kernel = app.Services.GetRequiredService<Kernel>();
-    var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
-    var executionSettings = new OpenAIPromptExecutionSettings
-    {
-        ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
-    };
-    var response = await chatCompletionService.GetChatMessageContentAsync(message.ToString(), executionSettings, kernel);
-    return response?.Content!;
-})
-    .WithName("Chat")
-    .WithOpenApi();
-
 
 app.Run();

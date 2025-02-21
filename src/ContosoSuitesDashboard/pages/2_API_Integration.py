@@ -1,29 +1,36 @@
 import requests
 import streamlit as st
+import time
 
 st.set_page_config(layout="wide")
 
+from requests.exceptions import Timeout, HTTPError
+
 @st.cache_data
 def get_hotels():
-    """Return a list of hotels from the API."""
+    """Return a list of hotels from the API with retry logic."""
     api_endpoint = st.secrets["api"]["endpoint"]
 
     if not api_endpoint.startswith("http"):
         api_endpoint = f"https://{api_endpoint}"
 
-    response = requests.get(f"{api_endpoint}/Hotels", timeout=10)
-
-    # Check if the response is successful and contains JSON
-    if response.status_code == 200:
+    retries = 3
+    for _ in range(retries):
         try:
+            response = requests.get(f"{api_endpoint}/Hotels", timeout=30)  # Increased timeout
+            response.raise_for_status()
             return response.json()
-        except ValueError:
-            st.error("Response content is not valid JSON.")
+        except Timeout:
+            st.warning("Request timed out. Retrying...")
+            time.sleep(2)  # Wait for 2 seconds before retrying
+        except requests.exceptions.HTTPError as http_err:
+            st.error(f"HTTP error occurred: {http_err}")
             return []
-    else:
-        st.error(f"Failed to fetch hotels. Status code: {response.status_code}")
-        return []
-
+        except Exception as err:
+            st.error(f"An error occurred: {err}")
+            return []
+    st.error("Failed to fetch hotels after multiple attempts.")
+    return []
 
 @st.cache_data
 def get_hotel_bookings(hotel_id):
